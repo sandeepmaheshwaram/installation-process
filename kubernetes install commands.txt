@@ -1,0 +1,681 @@
+==================Sonatype Nexus 3 using [ 2 cpus & 4 gb ram ] on Linux ec2===========
+
+
+This article guides you to install and configure Sonatype Nexus 3 in a secure way on an ec2 Linux System.
+
+Note: This was tested on a Redhat machine and it will work on Centos or related Linux flavors as well.
+
+Step 1: Login to your Linux server and update the yum packages. Also install required utilities.
+
+=sudo yum update -y
+=sudo yum install wget -y
+
+Step 2: Install OpenJDK 1.8
+
+=sudo yum install java-1.8.0-openjdk.x86_64 -y
+
+Step 3: Create a directory named app and cd into the directory.
+
+=sudo mkdir /app && cd /app
+
+Step 4: Download the latest nexus. You can get the latest download links fo for nexus from here.
+
+=sudo wget -O nexus.tar.gz https://download.sonatype.com/nexus/3/latest-unix.tar.gz
+
+Untar the downloaded file.
+
+=sudo tar -xvf nexus.tar.gz
+
+Rename the untared file to nexus.
+
+=sudo mv nexus-3* nexus
+
+Step 5: As a good security practice, it is not advised to run nexus service with root privileges. So create a new user named nexus to run the nexus service.
+
+=sudo adduser nexus
+
+Change the ownership of nexus files and nexus data directory to nexus user.
+
+=sudo chown -R nexus:nexus /app/nexus
+=sudo chown -R nexus:nexus /app/sonatype-work
+
+Step 6: Open /app/nexus/bin/nexus.rc file
+
+
+=sudo vi  /app/nexus/bin/nexus.rc
+Uncomment run_as_user parameter and set it as following.
+
+run_as_user="nexus"
+
+Step 7: If you want to change the default nexus data directory, open the nexus properties file and change the data directory -Dkaraf.data parameter to a preferred location as shown below. If you don’t specify anything, by default nexus data directory will be set to /app/sonatype-work/nexus3
+
+Tip: For production setup, it is is always better to mount the nexus data directory to a separate data disk attached to the server. So that backup and restore can be done easily.
+
+=sudo vi /app/nexus/bin/nexus.vmoptions
+An example configuration is shown below.
+
+-Xms2703m
+-Xmx2703m
+-XX:MaxDirectMemorySize=2703m
+-XX:+UnlockDiagnosticVMOptions
+-XX:+UnsyncloadClass
+-XX:+LogVMOutput
+-XX:LogFile=../sonatype-work/nexus3/log/jvm.log
+-XX:-OmitStackTraceInFastThrow
+-Djava.net.preferIPv4Stack=true
+-Dkaraf.home=.
+-Dkaraf.base=.
+-Dkaraf.etc=etc/karaf
+-Djava.util.logging.config.file=etc/karaf/java.util.logging.properties
+-Dkaraf.data=/nexus/nexus-data
+-Djava.io.tmpdir=../sonatype-work/nexus3/tmp
+-Dkaraf.startLocalConsole=false
+Running Nexus as a System Service
+It is better to have systemd entry to manage nexus using systemctl. Follow the steps given below for adding nexus as a systemd service.
+
+Create a nexus systemd unit file.
+
+=sudo vi /etc/systemd/system/nexus.service
+
+Add the following contents to the unit file.
+
+[Unit]
+Description=nexus service
+After=network.target
+
+[Service]
+Type=forking
+LimitNOFILE=65536
+User=nexus
+Group=nexus
+ExecStart=/app/nexus/bin/nexus start
+ExecStop=/app/nexus/bin/nexus stop
+User=nexus
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+
+Manage Nexus Service
+
+Now we have all the configurations in place to run nexus.
+
+Execute the following command to add nexus service to boot.
+
+=sudo chkconfig nexus on
+
+To start the Nexus service, use the following command. If you are having trouble starting nexus, please check the troubleshooting section below.
+
+=sudo systemctl start nexus
+
+The above command will start the nexus service on port 8081. To access the nexus dashboard, visit http://:8081. You will be able to see the nexus homepage as shown below.
+
+nexus 3 homepage
+To log in, use the default username and password.
+
+Default username is admin
+
+You can find the default admin password in /app/sonatype-work/nexus3/admin.password file. The path will be shown in the login screen as show below.
+
+nexus password min
+cat /app/sonatype-work/nexus3/admin.password
+Once you login, you will be prompted to reset the password.
+
+For stopping nexus, execute
+
+sudo systemctl stop nexus
+For restarting nexus,
+
+sudo systemctl restart nexus
+Sonatype Nexus not Starting [Troubleshooting]
+Sometimes, if the server is enabled with SELINUX, you might get the following error. (Commonly on Centos Servers)
+
+Job for nexus.service failed because the control process exited with error code.
+See "systemctl status nexus.service" and "journalctl -xe" for details.
+Execute the following command and see the actual error.
+
+journalctl -xe
+Check the output for the following SELINUX issue.
+
+SELinux is preventing /usr/lib/systemd/systemd from execute access on the file nexus.
+To rectify this issue, add a SELinux policy to allow Systemd to access the nexus binary in path /app/nexus/bin/nexus using the following command.
+
+sudo chcon -R -t bin_t /app/nexus/bin/nexus
+Now, start the Nexus server again.
+
+sudo systemctl start nexus
+
+====================================================================================================================================================
+
+
+============================   Installing Jenkins	: ---------
+
+
+
+==================JAVA================
+sudo apt update
+sudo apt install openjdk-11-jdk
+
+==========================JENKINS=============
+
+ curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo tee \
+  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+ 
+
+ sudo apt update
+
+ sudo apt install jenkins
+ 
+
+ systemctl start jenkins
+
+systemctl status jenkins
+
+systemctl restart jenkins
+
+
+
+to run a program getting error for docker :_
+cd var/lib/jenkins/workspace/job1 = add dockerfile.sh
+
+FROM openjdk:8-alpine
+
+# Required for starting application up.
+RUN apk update && apk add /bin/sh
+
+for docker.sock permmision denied
+
+use = chmod 777 docker.sock do  2 instances same issue
+
+
+======================================DOCKER===========
+sudo apt install docker.io -y 
+
+usermod -aG docker jenkins/ubuntu
+
+sudo systemctl daemon-reload 
+
+sudo systemctl restart docker
+
+sudo systemctl enable docker
+
+docker run -d --name jenkins -p 8080:8080 -p 50000:50000 jenkins/jenkins:lts-jdk11 { jenkins install on docker }
+
+docker run -d -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts-jdk11  [ volume of jenkins ]
+
+dockerfile
+
+FROM jenkins/jenkins:lts-jdk11
+USER root
+RUN apt update && \
+    apt install -y --no-install-recommends gnupg curl ca-certificates apt-transport-https && \
+    curl -sSfL https://apt.octopus.com/public.key | apt-key add - && \
+    sh -c "echo deb https://apt.octopus.com/ stable main > /etc/apt/sources.list.d/octopus.com.list" && \
+    apt update && apt install -y octopuscli
+USER jenkins
+
+
+
+{         Try:
+
+sudo apt-get purge -y docker.io 
+
+sudo apt-get autoremove -y --purge docker.io
+
+sudo apt-get autoclean
+
+sudo rm -rf /var/lib/docker
+
+sudo rm -rf /etc/docker
+
+sudo rm /etc/apparmor.d/docker
+
+sudo apt-get purge runc containerd docker.io  } 
+                                              
+
+
+
+node{
+     
+    stage('SCM Checkout'){
+        git url: 'https://github.com/sandeepmaheshwaram/java-web-app-docker.git',branch: 'master'
+    }
+        
+    stage(" Maven Clean Package"){
+      def mavenHome =  tool name: "maven", type: "maven"
+      def mavenCMD = "${mavenHome}/bin/mvn"
+      sh "${mavenCMD} clean package"
+      
+    } 
+    
+     stage('Build Docker Image'){
+        sh 'docker build -t dockersandy1/java-web-app-docker .'
+    }
+       stage('Push Docker Image'){
+        withCredentials([string(credentialsId: 'sandeep', variable: 'sandeep')]) {
+          sh "docker login -u dockersandy1 -p ${sandeep}"
+        }
+        sh 'docker push dockersandy1/java-web-app-docker'
+     }
+     
+    stage('Docker Image In dockerdeploy')
+    
+    {
+     sshagent(['dockerdeploy']) {
+         sh 'ssh -o StrictHostKeyChecking=no  ubuntu@10.0.1.87 docker run -d -p 8080:8080 --name javawebappcontainer dockersandy1/java-web-app-docker'
+     }
+
+      }
+}
+
+
+
+=======================================================================00=========0=0=000============0=============0=================0==========
+
+
+
+-----------JENKINS , DOCKER SWARM AND KUBERNETES INTEGRATION WITH DOCKER PRIVATE REPOSITORY---------------
+
+  [ must note sandeep get sudo update to every special install packages ]
+
+setup docker swarm 
+ubuntu 18.4 t2.micro 
+create 3 instances 
+
+1.docker master
+2.docker node1
+3.docker node2
+
+give all traffic to security groups key pair docker.pem
+
+
+1.update sudo 
+2.install java jdk [apt install default-jdk]
+3.install jenkins
+4.install docker swram =no need java================= [ sudo curl -fsSL get.docker.com | /bin/bash ] [docker swarm init ] [ docker swarm join-token worker ]==========================
+5. add docker user to jenkins  [ sudo usermod -aG docker jenkins/user ]
+           [ docker service create --name webserver --replicas 2 -p 80:80 httpd
+6.restart jenkins [ sudo systemctl restart jenkins ]
+7. 
+
+========================================doker swram pipe line script===================================
+
+node{
+
+    def buildNumber = BUILD_NUMBER
+
+    stage("SCM CheckOut"){
+        git url: 'https://github.com/sandeepmaheshwaram/java-web-app-docker.git',branch: 'master'
+    }
+    
+    stage(" Maven Clean Package"){
+      def mavenHome =  tool name: "maven", type: "maven"
+      def mavenCMD = "${mavenHome}/bin/mvn"
+      sh "${mavenCMD} clean package"
+    } 
+    
+    stage("Build Dokcer Image") {
+         sh "docker build -t dockersandy1/java-web-app:${buildNumber} ."
+    }
+    
+    stage("Docker Push"){
+        withCredentials([string(credentialsId: 'sandeep', variable: 'sandeep')]) {
+          sh "docker login -u dockersandy1 -p ${sandeep}"
+        }
+        sh "docker push dockersandy1/java-web-app:${buildNumber}"
+        
+    }
+    
+    // Remove local image in Jenkins Server
+    stage("Remove Local Image"){
+        sh "docker rmi -f dockersandy1/java-web-app:${buildNumber}"
+    }
+    
+    stage("Deploy to docker swarm cluster"){
+       sshagent(['dockerdeploy']) {
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@10.0.1.244 docker service rm javawebapp || true'
+            sh "ssh ubuntu@10.0.1.244 docker service create --name javawebapp -p 8080:8080 --replicas 2 dockersandy1/java-web-app:${buildNumber}"
+        }
+    }
+}
+
+========================================================================================================================================================
+
+
+To upload pivate repository ;- install nexus3/sonatype ...repository
+
+to install nexus use readhat lunux server & t2.medium
+ 1. sudo -i [ sudo yum update -y ] [ sudo yum install wget -y ]
+ 2. install java jdk
+ 3. change to opt floder [ cd/opt ]
+ 4. yum install tar wget -y
+ 5. download sonatype/nexus  from website 
+ 6. extract the tar file  
+ 7.mv /opt/nexus-3.22.1 /opt/nexus
+ 8. create a newuser ;- useradd nexus
+ 9. change permission ;- visudo
+ 10. nexus  ALL=(ALL) NOPASSWD:ALL
+ 11. chown -R nexus:nexus /opt/nexus
+ 12. chown -R nexus:nexus /opt/sonatype-work
+ 13. vi /opt/nexus/bin/nexus.rc  = run_as_user="nexus"
+ 14. ln -s /opt/nexus/bin/nexus /etc/init.d/nexus
+ 15. su - nexus
+ 16. sudo systemctl enable nexus
+ 17. sudo systemctl start nexus
+ 18. sudo systemctl status nexus
+
+  
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Kubernetes Cluster set up in AWS (using Master -2cpu's & 4 gb RAM  t2.midum & Node -1 cpu & 1gb RAM t2.micro)
+ KUBERNETES cluster setup:
+
+EXECUTE BELOW COMMANDS IN BOTH MASTER AND SLAVE MACHINES:--
+
+
+sudo apt-get update -y
+
+sudo apt install apt-transport-https curl -y
+
+sudo su -
+
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - 
+
+
+cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main 
+EOF
+
+
+sudo apt update -y
+
+
+sudo swapoff -a
+
+sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+
+modprobe br_netfilter
+sysctl -p
+sudo sysctl net.bridge.bridge-nf-call-iptables=1
+
+
+===========DOCKER================================================(docker)
+
+
+
+sudo apt install docker.io -y 
+
+usermod -aG docker jenkins/ubuntu
+
+sudo systemctl daemon-reload 
+
+sudo systemctl restart docker
+
+sudo systemctl enable docker
+
+
+withCredentials([string(credentialsId: 'DOKCER_HUB_PASSWORD', variable: 'DOCKER_HUB_PASSWORD')]) {
+}
+
+withCredentials([string(credentialsId: 'Docker_Hub_Pwd', variable: 'Docker_Hub_Pwd')]) {
+ 
+}
+
+# Add repo and Install packages
+
+sudo apt update
+
+sudo apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+sudo apt update
+
+sudo apt install -y containerd.io docker-ce docker-ce-cli
+
+
+
+# Create required directories
+
+sudo mkdir -p /etc/systemd/system/docker.service.d
+
+
+
+# Create daemon json config file
+
+sudo tee /etc/docker/daemon.json <<EOF
+
+{
+
+  "exec-opts": ["native.cgroupdriver=systemd"],
+
+  "log-driver": "json-file",
+
+  "log-opts": {
+
+    "max-size": "100m"
+
+  },
+
+  "storage-driver": "overlay2"
+
+}
+
+EOF
+
+
+
+# Start and enable Services
+
+sudo systemctl daemon-reload 
+
+sudo systemctl restart docker
+
+sudo systemctl enable docker
+
+
+
+
+sudo apt-get install -y kubelet kubeadm kubectl kubernetes-cni
+
+
+
+kubectl version --client && kubeadm version
+
+systemctl deamon-reload
+systemctl start kubelet
+systemctl enable kubelet.service
+
+
+
+sudo hostnamectl set-hostname kube-master
+
+sudo hostnamectl set-hostname kube-node
+
+
+
+========================================================node servers.....
+
+
+
+
+
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+
+
+kubeadm join 172.31.7.251:6443 --token b18ed2.8il2rl25gn3cccfr \
+
+        --discovery-token-ca-cert-hash sha256:1dc94830db9914e021c8712bd60b995a1aacd0bd419c0c815c0396980e1488b2
+
+
+
+mkdir -p $HOME/.kube
+
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+
+allow inbound rolls custom tcp--- 6443 
+
+
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/k8s-manifests/kube-flannel-rbac.yml
+
+kubectl get nodes
+
+kubectl get pods --all-namespaces
+
+to get token####
+
+kubeadm token create --print-join-command
+
+
+kubectl get componentstatus
+
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++
+kubectl apply -f https://k8s.io/examples/service/load-balancer-example.yaml
+
+
+
+kubectl get deployments hello-world
+kubectl describe deployments hello-world
+
+
+
+
+kubectl get replicasets
+kubectl describe replicasets
+
+
+kubectl expose deployment hello-world --type=LoadBalancer --name=my-service
+
+
+
+kubectl get services my-service
+
+
+kubectl describe services my-service
+
+
+kubectl get pods --output=wide
+
+kubectl delete services my-service
+kubectl delete deployment hello-world
+
+=================================================terraform=========================
+
+
+sudo -i
+
+yum update
+
+sudo yum install -y yum-utils
+ 
+yum install wget unzip vim -y
+
+change directory to opt to download terraform....
+
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+
+
+sudo yum -y install terraform
+
+terraform version
+terraform -v
+
+
+
+wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+
+sudo apt update 
+
+ sudo apt install terraform
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
